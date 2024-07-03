@@ -334,65 +334,45 @@ impl EventHandler {
         let now = Instant::now();
         self.mouse_samples.push_back((x, y, now));
     }
-
+    fn smooth_mouse_samples(&self, window_size: usize) -> (f64, f64) {
+        let mut sum_x = 0.0;
+        let mut sum_y = 0.0;
+        let count = self.mouse_samples.len().min(window_size);
+    
+        for &(x, y, _) in self.mouse_samples.iter().rev().take(count) {
+            sum_x += x as f64;
+            sum_y += y as f64;
+        }
+    
+        if count > 0 {
+            sum_x /= count as f64;
+            sum_y /= count as f64;
+        }
+    
+        (sum_x, sum_y)
+    }
+    fn apply_deadzone(&self, x: f64, y: f64, deadzone: f64) -> (f64, f64) {
+        let distance = (x * x + y * y).sqrt();
+        if distance < deadzone {
+            (0.0, 0.0)
+        } else {
+            (x, y)
+        }
+    }    
     fn update_analog(&mut self) {
         let now = Instant::now();
-
-        loop {
-            let sample = match self.mouse_samples.front() {
-                Some(sample) => sample,
-                None => break,
-            };
-
-            if now - sample.2 > self.config.sample_window {
-                self.mouse_samples.pop_front();
-            } else {
-                break;
-            }
-        }
-
+    
+        // Remove outdated samples
+        self.mouse_samples.retain(|&(_, _, time)| now - time <= self.config.sample_window);
+    
         if !self.analog_locked || now > self.analog_lock_end {
             self.analog_locked = false;
-
-            // let window = self.config.sample_window.as_secs_f64();
-            let mut mouse_vel = (0.0, 0.0);
-
-            /*
-            let dt_offset = if self.mouse_samples.len() > 0 {
-                let sample = self.mouse_samples[0];
-                if (now - sample.2).as_secs_f64() * 1000.0 < 1.0 {
-                    (now - sample.2).as_secs_f64()
-                } else {
-                    0.0005
-                }
-            } else {
-                0.0
-            };
-            */
-
-            for &(x, y, _) in self.mouse_samples.iter() {
-                // let dt = ((now - t).as_secs_f64() - dt_offset) / window;
-
-                mouse_vel.0 += x as f64;
-                mouse_vel.1 += y as f64;
-            }
-
-            // TODO: proper analog binds
-            if !self.config.analog_mask.0 {
-                mouse_vel.0 = 0.0;
-            }
-
-            if !self.config.analog_mask.1 {
-                mouse_vel.1 = 0.0;
-            }
-
-            let multiplier =
-                self.config.sensitivity / (1e4 * self.config.sample_window.as_secs_f64());
-
-            self.set_analog(
-                mouse_vel.0 as f64 * multiplier,
-                -mouse_vel.1 as f64 * multiplier,
-            );
+    
+            let (smoothed_x, smoothed_y) = self.smooth_mouse_samples(5); // Smoothing
+            let (x, y) = self.apply_deadzone(smoothed_x, smoothed_y, 0.05); // Adjust deadzone as needed
+    
+            let multiplier = self.config.sensitivity / (1e4 * self.config.sample_window.as_secs_f64());
+            self.set_analog(x * multiplier, -y * multiplier);
         } else {
             self.set_analog(self.analog_lock_x, self.analog_lock_y);
         }
@@ -401,7 +381,7 @@ impl EventHandler {
     fn set_analog(&mut self, x: f64, y: f64) {
         let alert = x.abs().max(y.abs()) >= self.config.oversteer_alert_threshold;
         self.tone_generator.as_mut().map(|tg| tg.enable(alert));
-
+    
         if self.config.analog_circularize {
             self.set_analog_circularized(x, y);
         } else {
@@ -412,27 +392,16 @@ impl EventHandler {
     fn set_analog_circularized(&mut self, x: f64, y: f64) {
         let angle = y.atan2(x);
         let radius = (x.powi(2) + y.powi(2)).sqrt();
-
-        self.report.s_thumb_lx = (angle.cos() * radius * Self::ANALOG_MAX) as i16;
-        self.report.s_thumb_ly = (angle.sin() * radius * Self::ANALOG_MAX) as i16;
+    
+        self.report.s_thumb_rx = (angle.cos() * radius * Self::ANALOG_MAX) as i16;
+        self.report.s_thumb_ry = (angle.sin() * radius * Self::ANALOG_MAX) as i16;
     }
-
+    
     fn set_analog_linear(&mut self, x: f64, y: f64) {
-        if x.abs() <= 1.0 && y.abs() <= 1.0 {
-            self.report.s_thumb_lx = (x * Self::ANALOG_MAX) as i16;
-            self.report.s_thumb_ly = (y * Self::ANALOG_MAX) as i16;
-
-            return;
-        }
-
-        let overshoot = x.abs().max(y.abs());
-
-        let angle = y.atan2(x);
-        let radius = (x.powi(2) + y.powi(2)).sqrt();
-
-        let new_radius = radius / overshoot;
-
-        self.report.s_thumb_lx = (angle.cos() * new_radius * Self::ANALOG_MAX) as i16;
-        self.report.s_thumb_ly = (angle.sin() * new_radius * Self::ANALOG_MAX) as i16;
+        let x = x.clamp(-1.0, 1.0);
+        let y = y.clamp(-1.0, 1.0);
+    
+        self.report.s_thumb_rx = (x * Self::ANALOG_MAX) as i16;
+        self.report.s_thumb_ry = (y * Self::ANALOG_MAX) as i16;
     }
 }

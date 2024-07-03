@@ -181,7 +181,7 @@ impl EventDispatcher {
 
             return false;
         }
-
+        // true
         if self.active {
             if changed_state {
                 self.tx.send(Event::Keyboard(code, state)).unwrap();
@@ -191,6 +191,7 @@ impl EventDispatcher {
         } else {
             true
         }
+
     }
 
     fn process_mouse_state(&mut self, device: ic::Device, state: ic::MouseState) {

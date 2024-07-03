@@ -1,0 +1,69 @@
+Config(
+    event_dispatcher: (
+        // The key used to switch from normal operation to controller emulation:
+        // Grave (= tilde) is the key to the left of number 1 on the number row,
+        // and should work well for most cases
+        toggle_key: Grave,
+    ),
+
+    event_handler: (
+        // Unitless coefficient, scale 0 -> +inf as you would expect
+        sensitivity: 6.00, // @ 3200 DPI
+
+        // The window over which mouse velocity is estimated:
+        //     Lower  -> less input latency
+        //     Higher -> greater accuracy and smoother stick position estimation
+        sample_window: (secs: 0, nanos: 3000000), // 4.5ms
+
+        // The maximum duration to spin-loop for before running a controller update
+        // if no input is recieved (required for correct velocity estimation)
+        spin_period: (secs: 0, nanos: 1750000), // 2ms
+
+        // Audio alert when the current mouse velocity is more than oversteer_alert_threshold
+        // times the velocity required for maximum stick angle
+        oversteer_alert_enabled: false,
+        oversteer_alert_threshold: 1.8,
+        oversteer_alert: (volume: 0.05, frequency: 440),
+
+        // X/Y stick motion mask
+        analog_mask: (true, true),
+
+        // Enable a dodgy hack to fix mouse button state tracking for Left/Right steer binds
+        mouse_button_fix: true,
+
+        // Keys are bound to controller buttons which are then bound to in-game actions (by you)
+        // See src/types.rs for the available options
+        binds: {
+            Mouse(Left): Button(RightTrigger),
+            Mouse(Right): Button(LeftTrigger),
+
+            // These match the default pad bindings
+            Keyboard(D): Button(RightTrigger),     // Accel
+            Keyboard(S): Button(LeftTrigger),      // Brake
+
+            Keyboard(Space): Button(B),            // Give up
+            Keyboard(LeftShift): Button(Y),        // Respawn
+
+            // These don't
+            Mouse(Middle): Button(LeftThumb),      // Push-to-talk (bound on Discord)
+            Mouse(Button4): Button(X),             // Show/Hide Opponents
+            Mouse(Button5): Button(RightShoulder), // Show/Hide Interface
+
+            Keyboard(Q): Button(DpadDown),         // Action Key 3
+            Keyboard(A): Button(DpadLeft),         // Action Key 2
+            Keyboard(Z): Button(DpadRight),        // Action Key 1
+            Keyboard(LeftControl): Button(DpadUp), // Action Key 5
+
+            Keyboard(Num1): Button(Start),         // Camera 1
+            Keyboard(Num2): Button(Back),          // Camera 2
+            Keyboard(Num3): Button(A),             // Camera 3
+
+            Keyboard(R): Button(Start),            // Camera 1
+            Keyboard(F): Button(Back),             // Camera 2
+            Keyboard(C): Button(A),                // Camera 3
+        },
+        dodge_binds: {
+            Jump: Keyboard(A), 
+        },
+    )
+)
